@@ -1,0 +1,96 @@
+{
+  "entities": {
+    "UserProfile": {
+      "path": "users/{userId}",
+      "fields": {
+        "userId": { "type": "string", "required": true },
+        "email": { "type": "string", "required": false },
+        "displayName": { "type": "string", "required": false },
+        "photoUrl": { "type": "string", "required": false },
+        "bio": { "type": "string", "required": false },
+        "followersCount": { "type": "number", "required": false },
+        "followingCount": { "type": "number", "required": false },
+        "storageUsedBytes": { "type": "number", "required": false },
+        "storageQuotaBytes": { "type": "number", "required": false },
+        "planId": { "type": "string", "required": false },
+        "lastSyncedAt": { "type": "timestamp", "required": false },
+        "createdAt": { "type": "timestamp", "required": true },
+        "updatedAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "SocialPost": {
+      "path": "posts/{postId}",
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "authorId": { "type": "string", "required": true },
+        "authorName": { "type": "string", "required": true },
+        "authorHandle": { "type": "string", "required": true },
+        "authorAvatar": { "type": "string", "required": true },
+        "timestamp": { "type": "string", "required": true },
+        "caption": { "type": "string", "required": true },
+        "tags": { "type": "array", "required": false },
+        "mediaUrl": { "type": "string", "required": true },
+        "isVideo": { "type": "boolean", "required": true },
+        "likesCount": { "type": "number", "required": true },
+        "likedUserIds": { "type": "array", "required": false },
+        "commentsCount": { "type": "number", "required": true },
+        "sharesCount": { "type": "number", "required": true },
+        "createdAt": { "type": "timestamp", "required": true },
+        "updatedAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "Comment": {
+      "path": "posts/{postId}/comments/{commentId}",
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "postId": { "type": "string", "required": true },
+        "authorId": { "type": "string", "required": true },
+        "authorName": { "type": "string", "required": true },
+        "authorAvatar": { "type": "string", "required": true },
+        "text": { "type": "string", "required": true },
+        "createdAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "VaultItem": {
+      "path": "users/{userId}/vault_items/{itemId}",
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "userId": { "type": "string", "required": true },
+        "title": { "type": "string", "required": true },
+        "type": { "type": "string", "required": true },
+        "mediaUrl": { "type": "string", "required": true },
+        "album": { "type": "string", "required": true },
+        "dateFormatted": { "type": "string", "required": true },
+        "originalSizeBytes": { "type": "number", "required": true },
+        "compressedSizeBytes": { "type": "number", "required": true },
+        "encryptionAlgorithm": { "type": "string", "required": true },
+        "keyAlias": { "type": "string", "required": true },
+        "sha256Hash": { "type": "string", "required": true },
+        "isFavorite": { "type": "boolean", "required": true },
+        "isDeleted": { "type": "boolean", "required": true },
+        "deletedAtTimestamp": { "type": "number", "required": false },
+        "videoDurationSec": { "type": "number", "required": false },
+        "resolution": { "type": "string", "required": false },
+        "iso": { "type": "string", "required": false },
+        "aperture": { "type": "string", "required": false },
+        "shutterSpeed": { "type": "string", "required": false },
+        "cameraModel": { "type": "string", "required": false },
+        "createdAt": { "type": "timestamp", "required": true },
+        "updatedAt": { "type": "timestamp", "required": true }
+      }
+    },
+    "BackupSnapshot": {
+      "path": "users/{userId}/snapshots/{snapshotId}",
+      "fields": {
+        "id": { "type": "string", "required": true },
+        "userId": { "type": "string", "required": true },
+        "name": { "type": "string", "required": true },
+        "dateFormatted": { "type": "string", "required": true },
+        "sizeMb": { "type": "number", "required": true },
+        "hash": { "type": "string", "required": true },
+        "status": { "type": "string", "required": true },
+        "createdAt": { "type": "timestamp", "required": true }
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "ZERO",
+  "description": "Encrypted private cloud vault, social feed, and video reels with biometric security and storage analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

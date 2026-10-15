@@ -1,0 +1,67 @@
+name: Android APK Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Grant execute permissions for Gradle wrapper
+        run: |
+          find . -name "gradlew" -exec chmod +x {} + || true
+
+      - name: Build Android APK with Gradle
+        run: |
+          echo "Starting Android Gradle build..."
+          if [ -f "./gradlew" ]; then
+            echo "Building from root with gradlew..."
+            ./gradlew assembleRelease --stacktrace || ./gradlew assembleDebug --stacktrace
+          elif [ -f "./android/gradlew" ]; then
+            echo "Building from android/ directory with gradlew..."
+            cd android
+            ./gradlew assembleRelease --stacktrace || ./gradlew assembleDebug --stacktrace
+            cd ..
+          elif [ -d "./android" ]; then
+            echo "Building from android/ directory using gradle..."
+            cd android
+            gradle assembleRelease --stacktrace || gradle assembleDebug --stacktrace
+            cd ..
+          else
+            echo "Building from root using gradle..."
+            gradle assembleRelease --stacktrace || gradle assembleDebug --stacktrace
+          fi
+
+      - name: Locate and list generated APKs
+        run: |
+          echo "Listing generated APK files:"
+          find . -type f -name "*.apk" -print
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZERO-Android-APK
+          path: '**/build/outputs/apk/**/*.apk'
+          if-no-files-found: error
+          retention-days: 30
