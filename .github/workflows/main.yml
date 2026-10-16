@@ -23,6 +23,9 @@ jobs:
           java-version: '21'
           cache: 'gradle'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
@@ -51,7 +54,7 @@ jobs:
       - name: Build Android APK with Gradle
         run: |
           echo "Building Android Debug APK..."
-          ./gradlew assembleDebug --stacktrace --no-daemon
+          ./gradlew assembleDebug --stacktrace --no-daemon -Dorg.gradle.workers.max=2
 
       - name: Locate and list generated APKs
         run: |
