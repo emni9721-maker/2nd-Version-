@@ -2,9 +2,9 @@ name: Android APK Build
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ '**' ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ '**' ]
   workflow_dispatch:
 
 jobs:
@@ -32,12 +32,12 @@ jobs:
           find . -name "gradlew" -exec chmod +x {} + || true
 
           echo "Restoring debug.keystore..."
-          if [ ! -f "debug.keystore" ]; then
+          if [ ! -f "debug.keystore" ] || [ ! -s "debug.keystore" ]; then
             if [ -f "debug.keystore.base64" ]; then
-              base64 -d debug.keystore.base64 > debug.keystore
-              echo "Restored debug.keystore from debug.keystore.base64"
-            else
-              echo "Generating fallback debug.keystore..."
+              base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || true
+            fi
+            if [ ! -f "debug.keystore" ] || [ ! -s "debug.keystore" ]; then
+              echo "Generating valid fallback debug.keystore..."
               keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
             fi
           fi
@@ -51,7 +51,7 @@ jobs:
       - name: Build Android APK with Gradle
         run: |
           echo "Building Android Debug APK..."
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug --stacktrace --no-daemon
 
       - name: Locate and list generated APKs
         run: |
