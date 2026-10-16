@@ -16,11 +16,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
           cache: 'gradle'
 
       - name: Set up Gradle
@@ -28,30 +28,32 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Grant execute permissions for Gradle wrapper
+      - name: Restore Keystore and Environment Config
         run: |
+          echo "Setting up permissions..."
           find . -name "gradlew" -exec chmod +x {} + || true
+
+          echo "Restoring debug.keystore..."
+          if [ ! -f "debug.keystore" ]; then
+            if [ -f "debug.keystore.base64" ]; then
+              base64 -d debug.keystore.base64 > debug.keystore
+              echo "Restored debug.keystore from debug.keystore.base64"
+            else
+              echo "Generating fallback debug.keystore..."
+              keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            fi
+          fi
+
+          echo "Checking .env file..."
+          if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+            cp .env.example .env
+            echo "Copied .env.example to .env"
+          fi
 
       - name: Build Android APK with Gradle
         run: |
-          echo "Starting Android Gradle build..."
-          if [ -f "./gradlew" ]; then
-            echo "Building from root with gradlew..."
-            ./gradlew assembleRelease --stacktrace || ./gradlew assembleDebug --stacktrace
-          elif [ -f "./android/gradlew" ]; then
-            echo "Building from android/ directory with gradlew..."
-            cd android
-            ./gradlew assembleRelease --stacktrace || ./gradlew assembleDebug --stacktrace
-            cd ..
-          elif [ -d "./android" ]; then
-            echo "Building from android/ directory using gradle..."
-            cd android
-            gradle assembleRelease --stacktrace || gradle assembleDebug --stacktrace
-            cd ..
-          else
-            echo "Building from root using gradle..."
-            gradle assembleRelease --stacktrace || gradle assembleDebug --stacktrace
-          fi
+          echo "Building Android Debug APK..."
+          ./gradlew assembleDebug --stacktrace
 
       - name: Locate and list generated APKs
         run: |
@@ -62,6 +64,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ZERO-Android-APK
-          path: '**/build/outputs/apk/**/*.apk'
+          path: 'app/build/outputs/apk/debug/*.apk'
           if-no-files-found: error
           retention-days: 30
