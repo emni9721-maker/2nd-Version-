@@ -21,7 +21,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,11 +33,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.credentials.CredentialManager
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.data.FirebaseAuthHelper
 import com.example.ui.AppTab
 import com.example.ui.MainViewModel
+import com.example.ui.components.CloudStorageViewDialog
 import com.example.ui.components.KotlinHubDialog
 import com.example.ui.components.MediaDetailDialog
 import com.example.ui.components.MessengerSheet
@@ -44,8 +45,12 @@ import com.example.ui.components.UploadModal
 import com.example.ui.components.ZeroBottomNav
 import com.example.ui.components.ZeroTopBar
 import com.example.ui.screens.AuthScreen
+import com.example.ui.screens.ChatScreen
+import com.example.ui.screens.EditProfileScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.LoginScreen
+import com.example.ui.screens.NotificationsScreen
+import com.example.ui.screens.PostsScreen
 import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.ReelsScreen
 import com.example.ui.screens.SettingsScreen
@@ -64,6 +69,7 @@ class MainActivity : ComponentActivity() {
       val context = LocalContext.current
 
       LaunchedEffect(Unit) {
+        viewModel.checkInitialSession(context)
         viewModel.initFirebase(context)
       }
 
@@ -79,30 +85,17 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun ZeroAppContent(viewModel: MainViewModel) {
   val context = LocalContext.current
+  val isSessionActive by viewModel.isSessionActive.collectAsState()
   val currentUser by viewModel.currentUser.collectAsState()
   val currentTab by viewModel.currentTab.collectAsState()
   val isAmoledMode by viewModel.isAmoledMode.collectAsState()
 
-  // Attempt silent auto-sign in on initial startup if not signed in
-  // Delayed slightly to allow initial window SurfaceSyncGroup to complete cleanly
-  LaunchedEffect(Unit) {
-    if (currentUser == null) {
-      delay(600)
-      val credentialManager = CredentialManager.create(context)
-      FirebaseAuthHelper.attemptAutoSignIn(
-        context = context,
-        credentialManager = credentialManager,
-        onAuthSuccess = { /* automatically triggers StateFlow update via authStateListener */ },
-        onUnauthenticated = { /* stays on AuthScreen */ },
-        scope = this
-      )
-    }
-  }
-
-  // Auth Gate: If user is not authenticated with Google, show LoginScreen
-  if (currentUser == null) {
+  // Auth Gate: Persistent session check - user remains logged in until explicit logout in Settings
+  if (currentUser == null && !isSessionActive) {
     LoginScreen(
-      onAuthSuccess = { /* user signed in; authStateListener updates currentUser */ }
+      onAuthSuccess = { identifier ->
+        viewModel.onSessionLogin(context, identifier)
+      }
     )
     return
   }
@@ -135,17 +128,37 @@ fun ZeroAppContent(viewModel: MainViewModel) {
   val cloudPlans by viewModel.cloudPlans.collectAsState()
   val snapshots by viewModel.snapshots.collectAsState()
 
-  // Modals
+  // Google Photos-style Automatic Backup
+  val isAutoBackupEnabled by viewModel.isAutoBackupEnabled.collectAsState()
+  val backupStatus by viewModel.backupStatus.collectAsState()
+  val lastBackupTime by viewModel.lastBackupTime.collectAsState()
+  val backupQuality by viewModel.backupQuality.collectAsState()
+  val backupWifiOnly by viewModel.backupWifiOnly.collectAsState()
+  val backupFolders by viewModel.backupFolders.collectAsState()
+  val isBackingUp by viewModel.isBackingUp.collectAsState()
+  val backupProgress by viewModel.backupProgress.collectAsState()
+
+  // Modals & Storage View
   val isUploadModalOpen by viewModel.isUploadModalOpen.collectAsState()
   val uploadDraft by viewModel.uploadDraft.collectAsState()
   val isKotlinHubOpen by viewModel.isKotlinHubOpen.collectAsState()
   val toastNotification by viewModel.toastNotification.collectAsState()
+  var isCloudStorageViewOpen by remember { mutableStateOf(false) }
+  var isEditProfileOpen by remember { mutableStateOf(false) }
+
+  // Notifications state
+  val notifications by viewModel.notifications.collectAsState()
+  val selectedLanguage by viewModel.selectedLanguage.collectAsState()
 
   val unreadMessagesCount = conversations.sumOf { it.unreadCount }
 
   // System Back Navigation Handling
   BackHandler(enabled = currentTab != AppTab.FEED) {
-    viewModel.setTab(AppTab.FEED)
+    if (currentTab == AppTab.VAULT) {
+      viewModel.setTab(AppTab.SETTINGS)
+    } else {
+      viewModel.setTab(AppTab.FEED)
+    }
   }
 
   // Toast Banner Auto Dismiss
@@ -158,21 +171,23 @@ fun ZeroAppContent(viewModel: MainViewModel) {
 
   Scaffold(
     topBar = {
-      ZeroTopBar(
-        isAmoledMode = isAmoledMode,
-        unreadMessagesCount = unreadMessagesCount,
-        userEmail = currentUser?.email,
-        onToggleAmoled = { viewModel.toggleAmoledMode() },
-        onOpenMessenger = { viewModel.openMessenger() },
-        onOpenSettings = { viewModel.setTab(AppTab.SETTINGS) }
-      )
+      if (currentTab != AppTab.REELS && currentTab != AppTab.VAULT && currentTab != AppTab.CHAT) {
+        ZeroTopBar(
+          onOpenSettings = { viewModel.setTab(AppTab.SETTINGS) },
+          onBackToFeed = { viewModel.setTab(AppTab.FEED) },
+          showBackButton = currentTab != AppTab.FEED
+        )
+      }
     },
     bottomBar = {
-      ZeroBottomNav(
-        currentTab = currentTab,
-        onSelectTab = { viewModel.setTab(it) },
-        onOpenUpload = { viewModel.openUploadModal() }
-      )
+      if (currentTab == AppTab.FEED) {
+        ZeroBottomNav(
+          currentTab = currentTab,
+          onSelectTab = { viewModel.setTab(it) },
+          unreadMessagesCount = unreadMessagesCount,
+          unreadNotificationsCount = notifications.count { !it.isRead }
+        )
+      }
     },
     modifier = Modifier
       .fillMaxSize()
@@ -194,6 +209,33 @@ fun ZeroAppContent(viewModel: MainViewModel) {
             onOpenUpload = { viewModel.openUploadModal() }
           )
         }
+        AppTab.POSTS -> {
+          PostsScreen(
+            posts = posts,
+            onToggleLike = { viewModel.togglePostLike(it) },
+            onAddComment = { postId, text -> viewModel.addCommentToPost(postId, text) },
+            onBackToFeed = { viewModel.setTab(AppTab.FEED) }
+          )
+        }
+        AppTab.CHAT -> {
+          ChatScreen(
+            conversations = conversations,
+            activeConversation = activeConversation,
+            onSelectConversation = { viewModel.selectConversation(it) },
+            onSendMessage = { convId, text -> viewModel.sendMessage(convId, text) },
+            onSendFileMessage = { convId, fileName, fileSize, ext ->
+              viewModel.sendFileMessage(convId, fileName, fileSize, ext)
+            },
+            onBackToFeed = { viewModel.setTab(AppTab.FEED) }
+          )
+        }
+        AppTab.NOTIFICATIONS -> {
+          NotificationsScreen(
+            notifications = notifications,
+            onBackToFeed = { viewModel.setTab(AppTab.FEED) },
+            onClearAll = { viewModel.clearAllNotifications() }
+          )
+        }
         AppTab.VAULT -> {
           VaultScreen(
             isUnlocked = isVaultUnlocked,
@@ -209,7 +251,8 @@ fun ZeroAppContent(viewModel: MainViewModel) {
             onSelectAlbum = { viewModel.setVaultAlbum(it) },
             onOpenDetail = { viewModel.openMediaDetail(it) },
             onRestoreMedia = { viewModel.restoreMedia(it) },
-            onPermanentlyDelete = { viewModel.permanentlyDeleteMedia(it) }
+            onPermanentlyDelete = { viewModel.permanentlyDeleteMedia(it) },
+            onBackToSettings = { viewModel.setTab(AppTab.SETTINGS) }
           )
         }
         AppTab.REELS -> {
@@ -221,17 +264,24 @@ fun ZeroAppContent(viewModel: MainViewModel) {
             onToggleLike = { viewModel.toggleReelLike(it) },
             onOpenComments = { viewModel.openReelsComments() },
             onCloseComments = { viewModel.closeReelsComments() },
-            onAddComment = { reelId, text -> viewModel.addCommentToReel(reelId, text) }
+            onAddComment = { reelId, text -> viewModel.addCommentToReel(reelId, text) },
+            onBackToFeed = { viewModel.setTab(AppTab.FEED) }
           )
         }
         AppTab.PROFILE -> {
           ProfileScreen(
             posts = posts,
             vaultItems = vaultItems,
+            reels = reels,
             currentUser = currentUser,
             userProfile = userProfile,
-            onOpenSettings = { viewModel.setTab(AppTab.SETTINGS) },
-            onSignOut = { viewModel.signOut(context) }
+            onOpenEditProfile = { isEditProfileOpen = true },
+            onOpenReel = { reelIndex ->
+              viewModel.setActiveReel(reelIndex)
+              viewModel.setTab(AppTab.REELS)
+            },
+            onOpenUpload = { viewModel.openUploadModal() },
+            onBackToFeed = { viewModel.setTab(AppTab.FEED) }
           )
         }
         AppTab.SETTINGS -> {
@@ -240,11 +290,39 @@ fun ZeroAppContent(viewModel: MainViewModel) {
             storageCategories = storageCategories,
             cloudPlans = cloudPlans,
             snapshots = snapshots,
+            isAutoBackupEnabled = isAutoBackupEnabled,
+            backupStatus = backupStatus,
+            lastBackupTime = lastBackupTime,
+            backupQuality = backupQuality,
+            backupWifiOnly = backupWifiOnly,
+            backupFolders = backupFolders,
+            isBackingUp = isBackingUp,
+            backupProgress = backupProgress,
+            onToggleAutoBackup = { viewModel.toggleAutoBackup() },
+            onTriggerBackupNow = { viewModel.triggerBackupNow() },
+            onSetBackupQuality = { viewModel.setBackupQuality(it) },
+            onToggleBackupWifiOnly = { viewModel.toggleBackupWifiOnly() },
+            onToggleBackupFolder = { viewModel.toggleBackupFolder(it) },
+            onOpenCloudStorageView = { isCloudStorageViewOpen = true },
+            onOpenVault = { viewModel.setTab(AppTab.VAULT) },
             onToggleAmoled = { viewModel.toggleAmoledMode() },
             onSelectPlan = { viewModel.selectCloudPlan(it) },
             onCreateSnapshot = { viewModel.createSnapshot() },
             onRestoreSnapshot = { viewModel.restoreSnapshot(it) },
-            onOpenKotlinHub = { viewModel.openKotlinHub() }
+            onOpenKotlinHub = { viewModel.openKotlinHub() },
+            onBackToFeed = { viewModel.setTab(AppTab.FEED) },
+            currentLanguage = selectedLanguage,
+            onSelectLanguage = { viewModel.setLanguage(it) },
+            userPhone = userProfile?.phoneNumber ?: "+880 1712-345678",
+            userPrimaryEmail = userProfile?.email?.ifBlank { currentUser?.email } ?: "emni9721@gmail.com",
+            userSecondaryEmail = userProfile?.secondaryEmail ?: "recovery@zero.io",
+            onUpdatePhone = { viewModel.updatePhoneNumber(it) },
+            onRemovePhone = { viewModel.removePhoneNumber() },
+            onUpdatePrimaryEmail = { viewModel.updatePrimaryEmail(it) },
+            onUpdateSecondaryEmail = { viewModel.updateRecoveryEmail(it) },
+            onRemoveSecondaryEmail = { viewModel.removeRecoveryEmail() },
+            onChangePassword = { cur, new, cb -> viewModel.changeMasterPassword(cur, new, cb) },
+            onSignOut = { viewModel.signOut(context) }
           )
         }
       }
@@ -319,6 +397,25 @@ fun ZeroAppContent(viewModel: MainViewModel) {
       if (isKotlinHubOpen) {
         KotlinHubDialog(
           onDismiss = { viewModel.closeKotlinHub() }
+        )
+      }
+
+      // Dialog: Cloud Storage View (Automatic Backup items)
+      if (isCloudStorageViewOpen) {
+        CloudStorageViewDialog(
+          onDismiss = { isCloudStorageViewOpen = false }
+        )
+      }
+
+      // Screen / Modal: Facebook-style Edit Profile
+      if (isEditProfileOpen) {
+        EditProfileScreen(
+          userProfile = userProfile,
+          currentUser = currentUser,
+          onSaveProfile = { name, bio, dob, loc, school, work, ctx ->
+            viewModel.updateFullUserProfile(name, bio, dob, loc, school, work, ctx)
+          },
+          onDismiss = { isEditProfileOpen = false }
         )
       }
     }

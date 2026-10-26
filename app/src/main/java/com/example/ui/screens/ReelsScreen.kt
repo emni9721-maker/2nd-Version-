@@ -22,9 +22,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.VolumeMute
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Favorite
@@ -32,10 +37,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.VolumeMute
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -83,6 +85,7 @@ fun ReelsScreen(
   onOpenComments: () -> Unit,
   onCloseComments: () -> Unit,
   onAddComment: (String, String) -> Unit,
+  onBackToFeed: (() -> Unit)? = null,
   modifier: Modifier = Modifier
 ) {
   val pagerState = rememberPagerState(initialPage = activeReelIndex, pageCount = { reels.size })
@@ -102,6 +105,28 @@ fun ReelsScreen(
         onToggleLike = { onToggleLike(reel.id) },
         onOpenComments = onOpenComments
       )
+    }
+
+    // Top Back Button Overlay
+    if (onBackToFeed != null) {
+      IconButton(
+        onClick = onBackToFeed,
+        modifier = Modifier
+          .statusBarsPadding()
+          .padding(top = 10.dp, start = 12.dp)
+          .align(Alignment.TopStart)
+          .size(40.dp)
+          .clip(CircleShape)
+          .background(Color.Black.copy(alpha = 0.55f))
+          .testTag("reels_back_to_feed")
+      ) {
+        Icon(
+          imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+          contentDescription = "Back to Feed",
+          tint = Color.White,
+          modifier = Modifier.size(22.dp)
+        )
+      }
     }
 
     // Comment Sheet
@@ -175,7 +200,7 @@ private fun ReelItem(
         .background(Color.Black.copy(alpha = 0.5f))
     ) {
       Icon(
-        imageVector = if (isMuted) Icons.Default.VolumeMute else Icons.Default.VolumeUp,
+        imageVector = if (isMuted) Icons.AutoMirrored.Filled.VolumeMute else Icons.AutoMirrored.Filled.VolumeUp,
         contentDescription = "Toggle Mute",
         tint = Color.White,
         modifier = Modifier.size(20.dp)
@@ -457,7 +482,7 @@ private fun ReelCommentSheet(
             .background(EmeraldPrimary)
         ) {
           Icon(
-            imageVector = Icons.Default.Send,
+            imageVector = Icons.AutoMirrored.Filled.Send,
             contentDescription = "Send",
             tint = Color.Black
           )

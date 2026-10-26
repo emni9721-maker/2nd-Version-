@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DynamicFeed
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -42,11 +43,16 @@ import com.example.ui.theme.ObsidianBorder
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.Notifications
+
 @Composable
 fun ZeroBottomNav(
   currentTab: AppTab,
   onSelectTab: (AppTab) -> Unit,
-  onOpenUpload: () -> Unit,
+  onOpenUpload: (() -> Unit)? = null,
+  unreadMessagesCount: Int = 0,
+  unreadNotificationsCount: Int = 0,
   modifier: Modifier = Modifier
 ) {
   Box(
@@ -73,45 +79,46 @@ fun ZeroBottomNav(
         testTag = "nav_tab_feed"
       )
 
-      // Tab 2: Vault
-      NavTabItem(
-        label = "Vault",
-        icon = Icons.Default.Lock,
-        isSelected = currentTab == AppTab.VAULT,
-        onClick = { onSelectTab(AppTab.VAULT) },
-        testTag = "nav_tab_vault"
-      )
-
-      // Center Action Button: Upload / Create
-      Box(
-        modifier = Modifier
-          .size(48.dp)
-          .shadow(8.dp, CircleShape)
-          .clip(CircleShape)
-          .background(
-            Brush.linearGradient(
-              listOf(EmeraldPrimary, CyanAccent)
-            )
-          )
-          .clickable(onClick = onOpenUpload)
-          .testTag("nav_center_upload_button"),
-        contentAlignment = Alignment.Center
-      ) {
-        Icon(
-          imageVector = Icons.Default.Add,
-          contentDescription = "Upload Encrypted Media",
-          tint = Color.Black,
-          modifier = Modifier.size(28.dp)
-        )
-      }
-
-      // Tab 3: Reels
+      // Tab 2: Reels (Replaced Posts as requested)
       NavTabItem(
         label = "Reels",
         icon = Icons.Default.VideoLibrary,
         isSelected = currentTab == AppTab.REELS,
         onClick = { onSelectTab(AppTab.REELS) },
         testTag = "nav_tab_reels"
+      )
+
+      // Center Action Button: Chat (Replaced Upload as requested)
+      Box(
+        modifier = Modifier
+          .size(50.dp)
+          .shadow(10.dp, CircleShape)
+          .clip(CircleShape)
+          .background(
+            if (currentTab == AppTab.CHAT)
+              Brush.linearGradient(listOf(CyanAccent, EmeraldPrimary))
+            else
+              Brush.linearGradient(listOf(EmeraldPrimary, CyanAccent))
+          )
+          .clickable { onSelectTab(AppTab.CHAT) }
+          .testTag("nav_center_chat_button"),
+        contentAlignment = Alignment.Center
+      ) {
+        Icon(
+          imageVector = Icons.Default.ChatBubble,
+          contentDescription = "Chat",
+          tint = Color.Black,
+          modifier = Modifier.size(24.dp)
+        )
+      }
+
+      // Tab 3: Notifications (Replaced Reels as requested)
+      NavTabItem(
+        label = "Alerts",
+        icon = Icons.Default.Notifications,
+        isSelected = currentTab == AppTab.NOTIFICATIONS,
+        onClick = { onSelectTab(AppTab.NOTIFICATIONS) },
+        testTag = "nav_tab_notifications"
       )
 
       // Tab 4: Profile

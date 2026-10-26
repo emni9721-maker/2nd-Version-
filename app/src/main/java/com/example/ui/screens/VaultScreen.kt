@@ -29,7 +29,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
@@ -92,6 +93,7 @@ fun VaultScreen(
   onOpenDetail: (VaultItem) -> Unit,
   onRestoreMedia: (String) -> Unit,
   onPermanentlyDelete: (String) -> Unit,
+  onBackToSettings: (() -> Unit)? = null,
   modifier: Modifier = Modifier
 ) {
   if (!isUnlocked) {
@@ -101,6 +103,7 @@ fun VaultScreen(
       onPinDigit = onPinDigit,
       onPinDelete = onPinDelete,
       onUnlockBiometric = onUnlockBiometric,
+      onBackToSettings = onBackToSettings,
       modifier = modifier
     )
   } else {
@@ -113,6 +116,7 @@ fun VaultScreen(
       onOpenDetail = onOpenDetail,
       onRestoreMedia = onRestoreMedia,
       onPermanentlyDelete = onPermanentlyDelete,
+      onBackToSettings = onBackToSettings,
       modifier = modifier
     )
   }
@@ -125,6 +129,7 @@ private fun VaultLockGate(
   onPinDigit: (String) -> Unit,
   onPinDelete: () -> Unit,
   onUnlockBiometric: () -> Unit,
+  onBackToSettings: (() -> Unit)? = null,
   modifier: Modifier = Modifier
 ) {
   val pulseTransition = rememberInfiniteTransition(label = "bioPulse")
@@ -146,10 +151,29 @@ private fun VaultLockGate(
     horizontalAlignment = Alignment.CenterHorizontally,
     verticalArrangement = Arrangement.SpaceBetween
   ) {
+    // Back to Settings row if navigated from Settings
+    if (onBackToSettings != null) {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start
+      ) {
+        IconButton(
+          onClick = onBackToSettings,
+          modifier = Modifier.testTag("vault_back_to_settings_btn")
+        ) {
+          Icon(
+            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = "Back to Settings",
+            tint = TextPrimary
+          )
+        }
+      }
+    }
+
     // Header & Icon
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
-      modifier = Modifier.padding(top = 16.dp)
+      modifier = Modifier.padding(top = if (onBackToSettings != null) 0.dp else 16.dp)
     ) {
       Box(
         modifier = Modifier
@@ -301,7 +325,7 @@ private fun VaultLockGate(
           contentAlignment = Alignment.Center
         ) {
           Icon(
-            imageVector = Icons.Default.Backspace,
+            imageVector = Icons.AutoMirrored.Filled.Backspace,
             contentDescription = "Backspace",
             tint = TextSecondary,
             modifier = Modifier.size(22.dp)
@@ -349,6 +373,7 @@ private fun VaultGalleryContent(
   onOpenDetail: (VaultItem) -> Unit,
   onRestoreMedia: (String) -> Unit,
   onPermanentlyDelete: (String) -> Unit,
+  onBackToSettings: (() -> Unit)? = null,
   modifier: Modifier = Modifier
 ) {
   val albums = listOf("All Media", "Camera", "Wallpapers", "Secret Vault", "Downloads", "Trash")
@@ -392,7 +417,7 @@ private fun VaultGalleryContent(
       }
     }
 
-    // Top Controls: Lock button & Stats
+    // Top Controls: Back button, Lock button & Stats
     Row(
       modifier = Modifier
         .fillMaxWidth()
@@ -400,18 +425,36 @@ private fun VaultGalleryContent(
       horizontalArrangement = Arrangement.SpaceBetween,
       verticalAlignment = Alignment.CenterVertically
     ) {
-      Column {
-        Text(
-          text = if (selectedAlbum == "Trash") "30-Day Trash Bin" else "Hardware Safe",
-          fontSize = 18.sp,
-          fontWeight = FontWeight.ExtraBold,
-          color = TextPrimary
-        )
-        Text(
-          text = "${filteredItems.size} items protected",
-          fontSize = 12.sp,
-          color = TextSecondary
-        )
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        if (onBackToSettings != null) {
+          IconButton(
+            onClick = onBackToSettings,
+            modifier = Modifier
+              .size(36.dp)
+              .testTag("vault_gallery_back_to_settings")
+          ) {
+            Icon(
+              imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+              contentDescription = "Back to Settings",
+              tint = TextPrimary
+            )
+          }
+          Spacer(modifier = Modifier.width(8.dp))
+        }
+
+        Column {
+          Text(
+            text = if (selectedAlbum == "Trash") "30-Day Trash Bin" else "Hardware Safe",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = TextPrimary
+          )
+          Text(
+            text = "${filteredItems.size} items protected",
+            fontSize = 12.sp,
+            color = TextSecondary
+          )
+        }
       }
 
       OutlinedButton(

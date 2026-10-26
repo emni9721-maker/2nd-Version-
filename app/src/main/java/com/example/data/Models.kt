@@ -105,7 +105,22 @@ data class ChatMessage(
   val text: String,
   val timestamp: String,
   val isMine: Boolean,
-  val isEncrypted: Boolean = true
+  val isEncrypted: Boolean = true,
+  val fileName: String? = null,
+  val fileSizeFormatted: String? = null,
+  val fileExtension: String? = null,
+  val isOriginalFile: Boolean = false,
+  val isRead: Boolean = true
+)
+
+data class AppNotification(
+  val id: String,
+  val title: String,
+  val description: String,
+  val time: String,
+  val iconType: String = "CLOUD", // CLOUD, BACKUP, VAULT, SOCIAL, FILE
+  val isRead: Boolean = false,
+  val avatarUrl: String? = null
 )
 
 data class Conversation(

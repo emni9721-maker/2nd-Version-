@@ -26,7 +26,16 @@ data class UserProfile(
   val storageUsedBytes: Long = 19_756_849_152L, // 18.4 GB
   val storageQuotaBytes: Long = 53_687_091_200L, // 50 GB
   val planId: String = "tier-starter",
-  val lastSyncedAt: Timestamp? = null
+  val lastSyncedAt: Timestamp? = null,
+  val username: String = "@zerouser",
+  val phoneNumber: String = "+880 1712-345678",
+  val age: Int = 24,
+  val secondaryEmail: String = "recovery@zero.io",
+  val preferredLanguage: String = "English",
+  val dateOfBirth: String = "15 August 2000",
+  val location: String = "Dhaka, Bangladesh",
+  val schoolCollege: String = "Dhaka College / University of Dhaka",
+  val workplace: String = "Zero Cloud Security Lab"
 )
 
 /**
@@ -56,7 +65,14 @@ class Repository(private val db: FirebaseFirestore) {
   // 1. User Profile Synchronization
   // =========================================================================
 
-  suspend fun syncUserProfile(email: String?, displayName: String?, photoUrl: String?) {
+  suspend fun syncUserProfile(
+    email: String?,
+    displayName: String?,
+    photoUrl: String?,
+    username: String? = null,
+    phoneNumber: String? = null,
+    age: Int? = null
+  ) {
     val uid = requireUserId()
     val docRef = db.collection("users").document(uid)
     val existing = docRef.get().await()
@@ -69,6 +85,9 @@ class Repository(private val db: FirebaseFirestore) {
       "lastSyncedAt" to FieldValue.serverTimestamp(),
       "updatedAt" to FieldValue.serverTimestamp()
     )
+    if (!username.isNullOrBlank()) payload["username"] = username
+    if (!phoneNumber.isNullOrBlank()) payload["phoneNumber"] = phoneNumber
+    if (age != null && age > 0) payload["age"] = age.toLong()
 
     if (!existing.exists()) {
       payload["createdAt"] = FieldValue.serverTimestamp()
@@ -78,10 +97,28 @@ class Repository(private val db: FirebaseFirestore) {
       payload["storageUsedBytes"] = 19_756_849_152L
       payload["storageQuotaBytes"] = 53_687_091_200L
       payload["planId"] = "tier-starter"
+      if (!payload.containsKey("username")) payload["username"] = "@zerouser"
+      if (!payload.containsKey("phoneNumber")) payload["phoneNumber"] = "+880 1712-345678"
+      if (!payload.containsKey("age")) payload["age"] = 24L
     }
 
     docRef.set(payload, SetOptions.merge()).await()
     Log.d(TAG, "Synchronized profile data for user: $uid ($email)")
+  }
+
+  suspend fun updateUserProfileSecurity(
+    phoneNumber: String? = null,
+    secondaryEmail: String? = null,
+    preferredLanguage: String? = null
+  ) {
+    val uid = requireUserId()
+    val updates = mutableMapOf<String, Any>(
+      "updatedAt" to FieldValue.serverTimestamp()
+    )
+    if (phoneNumber != null) updates["phoneNumber"] = phoneNumber
+    if (secondaryEmail != null) updates["secondaryEmail"] = secondaryEmail
+    if (preferredLanguage != null) updates["preferredLanguage"] = preferredLanguage
+    db.collection("users").document(uid).set(updates, SetOptions.merge()).await()
   }
 
   fun observeUserProfile(userId: String): Flow<UserProfile?> = callbackFlow {
@@ -103,7 +140,16 @@ class Repository(private val db: FirebaseFirestore) {
           storageUsedBytes = snapshot.getLong("storageUsedBytes") ?: 19_756_849_152L,
           storageQuotaBytes = snapshot.getLong("storageQuotaBytes") ?: 53_687_091_200L,
           planId = snapshot.getString("planId") ?: "tier-starter",
-          lastSyncedAt = snapshot.getTimestamp("lastSyncedAt")
+          lastSyncedAt = snapshot.getTimestamp("lastSyncedAt"),
+          username = snapshot.getString("username") ?: "@zerouser",
+          phoneNumber = snapshot.getString("phoneNumber") ?: "+880 1712-345678",
+          age = snapshot.getLong("age")?.toInt() ?: 24,
+          secondaryEmail = snapshot.getString("secondaryEmail") ?: "recovery@zero.io",
+          preferredLanguage = snapshot.getString("preferredLanguage") ?: "English",
+          dateOfBirth = snapshot.getString("dateOfBirth") ?: "15 August 2000",
+          location = snapshot.getString("location") ?: "Dhaka, Bangladesh",
+          schoolCollege = snapshot.getString("schoolCollege") ?: "Dhaka College / University of Dhaka",
+          workplace = snapshot.getString("workplace") ?: "Zero Cloud Security Lab"
         )
         trySend(profile)
       } else {
@@ -111,6 +157,28 @@ class Repository(private val db: FirebaseFirestore) {
       }
     }
     awaitClose { listener.remove() }
+  }
+
+  suspend fun updateFullUserProfile(
+    displayName: String? = null,
+    bio: String? = null,
+    dateOfBirth: String? = null,
+    location: String? = null,
+    schoolCollege: String? = null,
+    workplace: String? = null
+  ) {
+    val uid = try { requireUserId() } catch (_: Exception) { return }
+    val updates = mutableMapOf<String, Any>(
+      "updatedAt" to FieldValue.serverTimestamp()
+    )
+    if (displayName != null) updates["displayName"] = displayName
+    if (bio != null) updates["bio"] = bio
+    if (dateOfBirth != null) updates["dateOfBirth"] = dateOfBirth
+    if (location != null) updates["location"] = location
+    if (schoolCollege != null) updates["schoolCollege"] = schoolCollege
+    if (workplace != null) updates["workplace"] = workplace
+
+    db.collection("users").document(uid).set(updates, SetOptions.merge()).await()
   }
 
   suspend fun updateUserBio(bio: String) {

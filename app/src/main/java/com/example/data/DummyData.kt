@@ -191,11 +191,25 @@ object DummyData {
       messages = listOf(
         ChatMessage("m-1", "Hey! Have you configured the new Keystore AES-256 master key?", "11:58 AM", isMine = false),
         ChatMessage("m-2", "Yes! Just upgraded. The StrongBox secure enclave integration is super fast.", "12:01 PM", isMine = true),
-        ChatMessage("m-3", "Awesome! Did you get the encrypted photo from the vault?", "12:04 PM", isMine = false)
+        ChatMessage("m-3", "Awesome! I sent the 1.4 GB raw photoshoot archive. Zero compression, full fidelity.", "12:04 PM", isMine = false, fileName = "Studio_RAW_Archive_Batch9.zip", fileSizeFormatted = "1.4 GB", fileExtension = "ZIP", isOriginalFile = true)
       )
     ),
     Conversation(
       id = "conv-2",
+      participantName = "Liam Ray (Cinematographer)",
+      participantHandle = "@liam_4k",
+      participantAvatar = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80",
+      isOnline = true,
+      lastMessage = "Sent 4K ProRes master reel (2.8 GB uncompressed)",
+      lastMessageTime = "11:20 AM",
+      unreadCount = 1,
+      messages = listOf(
+        ChatMessage("m-l1", "Hey, here is the original camera ProRes export directly from RED V-Raptor. No WhatsApp video downgrading!", "11:15 AM", isMine = false),
+        ChatMessage("m-l2", "Here is the uncompressed 4K master file:", "11:20 AM", isMine = false, fileName = "Cyberpunk_City_4K_ProRes.mov", fileSizeFormatted = "2.8 GB", fileExtension = "MOV", isOriginalFile = true)
+      )
+    ),
+    Conversation(
+      id = "conv-3",
       participantName = "Nova Security Bot",
       participantHandle = "@zerobot",
       participantAvatar = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80",
@@ -204,9 +218,17 @@ object DummyData {
       lastMessageTime = "10:15 AM",
       unreadCount = 0,
       messages = listOf(
-        ChatMessage("m-4", "System report: Daily database snapshot completed. Integrity checksum verified (SHA-256: 8f4e2c...b19d).", "10:15 AM", isMine = false)
+        ChatMessage("m-4", "System report: Daily database snapshot completed. Integrity checksum verified (SHA-256: 8f4e2c...b19d).", "10:15 AM", isMine = false, fileName = "Snapshot_FullBackup_AES256.iso", fileSizeFormatted = "18.4 GB", fileExtension = "ISO", isOriginalFile = true)
       )
     )
+  )
+
+  val initialNotifications = listOf(
+    AppNotification("notif-1", "Original Large File Received", "Liam Ray sent you Cyberpunk_City_4K_ProRes.mov (2.8 GB uncompressed).", "5m ago", "FILE", false),
+    AppNotification("notif-2", "Automatic Backup Complete", "32 photos and 4 high-bitrate videos safely backed up to Google Photos Cloud.", "20m ago", "BACKUP", false),
+    AppNotification("notif-3", "New Reel Comment", "Aria commented on your Neo-Tokyo 4K reel.", "1h ago", "SOCIAL", true),
+    AppNotification("notif-4", "Hardware Vault Synced", "StrongBox AES-256 keys refreshed with biometric authentication.", "3h ago", "VAULT", true),
+    AppNotification("notif-5", "Encrypted Cloud Storage Alert", "You have used 18.4 GB out of 50.0 GB (36%).", "1d ago", "CLOUD", true)
   )
 
   val storageCategories = listOf(

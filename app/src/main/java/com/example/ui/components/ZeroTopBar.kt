@@ -18,10 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -48,12 +46,14 @@ import com.example.ui.theme.TextPrimary
 
 @Composable
 fun ZeroTopBar(
-  isAmoledMode: Boolean,
-  unreadMessagesCount: Int,
-  userEmail: String? = null,
-  onToggleAmoled: () -> Unit,
-  onOpenMessenger: () -> Unit,
+  unreadMessagesCount: Int = 0,
+  onOpenMessenger: (() -> Unit)? = null,
   onOpenSettings: () -> Unit,
+  onBackToFeed: (() -> Unit)? = null,
+  showBackButton: Boolean = false,
+  isAmoledMode: Boolean = false,
+  userEmail: String? = null,
+  onToggleAmoled: (() -> Unit)? = null,
   modifier: Modifier = Modifier
 ) {
   val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -79,26 +79,28 @@ fun ZeroTopBar(
       horizontalArrangement = Arrangement.SpaceBetween,
       verticalAlignment = Alignment.CenterVertically
     ) {
-      // Left: Logo & Sync Status
+      // Left: Optional Back Arrow, Logo & Sync Status
       Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
       ) {
-        Box(
-          modifier = Modifier
-            .size(34.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(EmeraldPrimary.copy(alpha = 0.15f))
-            .border(1.dp, EmeraldPrimary.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
-          contentAlignment = Alignment.Center
-        ) {
-          Icon(
-            imageVector = Icons.Default.Lock,
-            contentDescription = "Zero Shield",
-            tint = EmeraldPrimary,
-            modifier = Modifier.size(18.dp)
-          )
+        if (showBackButton && onBackToFeed != null) {
+          IconButton(
+            onClick = onBackToFeed,
+            modifier = Modifier
+              .size(32.dp)
+              .testTag("topbar_back_button")
+          ) {
+            Icon(
+              imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+              contentDescription = "Back",
+              tint = TextPrimary,
+              modifier = Modifier.size(20.dp)
+            )
+          }
         }
+
+        ZeroZLogo(size = 32.dp, enablePulse = false)
 
         Text(
           text = "ZERO",
@@ -108,7 +110,7 @@ fun ZeroTopBar(
           color = TextPrimary
         )
 
-        // Cloud Synced Pill
+        // Cloud Synced Pill (Shows E2EE Cloud, never shows user profile name)
         Row(
           modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
@@ -126,7 +128,7 @@ fun ZeroTopBar(
               .alpha(pulseAlpha)
           )
           Text(
-            text = if (!userEmail.isNullOrBlank()) userEmail.substringBefore("@") else "E2EE Cloud",
+            text = "E2EE Cloud",
             color = CyanAccent,
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
@@ -135,54 +137,11 @@ fun ZeroTopBar(
         }
       }
 
-      // Right: Actions
+      // Right: Actions (Theme button inside Settings; Chat removed as requested)
       Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
       ) {
-        // AMOLED Toggle
-        IconButton(
-          onClick = onToggleAmoled,
-          modifier = Modifier.testTag("amoled_toggle_button")
-        ) {
-          Icon(
-            imageVector = if (isAmoledMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-            contentDescription = "Toggle AMOLED Mode",
-            tint = if (isAmoledMode) EmeraldPrimary else TextMuted,
-            modifier = Modifier.size(20.dp)
-          )
-        }
-
-        // Messenger Icon with Badge
-        BadgedBox(
-          badge = {
-            if (unreadMessagesCount > 0) {
-              Badge(
-                containerColor = EmeraldPrimary,
-                contentColor = Color.Black
-              ) {
-                Text(
-                  text = unreadMessagesCount.toString(),
-                  fontSize = 10.sp,
-                  fontWeight = FontWeight.Bold
-                )
-              }
-            }
-          }
-        ) {
-          IconButton(
-            onClick = onOpenMessenger,
-            modifier = Modifier.testTag("messenger_button")
-          ) {
-            Icon(
-              imageVector = Icons.Default.ChatBubbleOutline,
-              contentDescription = "Direct Messenger",
-              tint = TextPrimary,
-              modifier = Modifier.size(22.dp)
-            )
-          }
-        }
-
         // Settings Icon
         IconButton(
           onClick = onOpenSettings,

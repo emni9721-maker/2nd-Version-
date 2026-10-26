@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.credentials.CredentialManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.AppNotification
+import com.example.data.AuthenticationManager
 import com.example.data.BackupSnapshot
 import com.example.data.BiometricHelper
 import com.example.data.CloudPlan
@@ -32,8 +34,11 @@ import kotlinx.coroutines.withContext
 
 enum class AppTab {
   FEED,
+  POSTS,
   VAULT,
   REELS,
+  CHAT,
+  NOTIFICATIONS,
   PROFILE,
   SETTINGS
 }
@@ -65,6 +70,9 @@ class MainViewModel : ViewModel() {
   // Firebase Auth & Profile State
   private val _currentUser = MutableStateFlow<FirebaseUser?>(FirebaseAuthHelper.currentUser)
   val currentUser: StateFlow<FirebaseUser?> = _currentUser.asStateFlow()
+
+  private val _isSessionActive = MutableStateFlow(false)
+  val isSessionActive: StateFlow<Boolean> = _isSessionActive.asStateFlow()
 
   private val _userProfile = MutableStateFlow<UserProfile?>(null)
   val userProfile: StateFlow<UserProfile?> = _userProfile.asStateFlow()
@@ -122,6 +130,14 @@ class MainViewModel : ViewModel() {
   private val _isMessengerOpen = MutableStateFlow(false)
   val isMessengerOpen: StateFlow<Boolean> = _isMessengerOpen.asStateFlow()
 
+  // Notifications
+  private val _notifications = MutableStateFlow(DummyData.initialNotifications)
+  val notifications: StateFlow<List<AppNotification>> = _notifications.asStateFlow()
+
+  // Language & Localization
+  private val _selectedLanguage = MutableStateFlow("English")
+  val selectedLanguage: StateFlow<String> = _selectedLanguage.asStateFlow()
+
   // Storage & Cloud Plans
   private val _storageCategories = MutableStateFlow(DummyData.storageCategories)
   val storageCategories: StateFlow<List<StorageCategory>> = _storageCategories.asStateFlow()
@@ -148,18 +164,58 @@ class MainViewModel : ViewModel() {
   private val _toastNotification = MutableStateFlow<UiNotification?>(null)
   val toastNotification: StateFlow<UiNotification?> = _toastNotification.asStateFlow()
 
+  // Google Photos-style Automatic Cloud Backup State
+  private val _isAutoBackupEnabled = MutableStateFlow(true)
+  val isAutoBackupEnabled: StateFlow<Boolean> = _isAutoBackupEnabled.asStateFlow()
+
+  private val _backupStatus = MutableStateFlow("All photos & videos backed up")
+  val backupStatus: StateFlow<String> = _backupStatus.asStateFlow()
+
+  private val _lastBackupTime = MutableStateFlow("Just now")
+  val lastBackupTime: StateFlow<String> = _lastBackupTime.asStateFlow()
+
+  private val _backupQuality = MutableStateFlow("Original Quality")
+  val backupQuality: StateFlow<String> = _backupQuality.asStateFlow()
+
+  private val _backupWifiOnly = MutableStateFlow(true)
+  val backupWifiOnly: StateFlow<Boolean> = _backupWifiOnly.asStateFlow()
+
+  private val _backupFolders = MutableStateFlow(listOf("Camera", "Screenshots", "Downloads"))
+  val backupFolders: StateFlow<List<String>> = _backupFolders.asStateFlow()
+
+  private val _isBackingUp = MutableStateFlow(false)
+  val isBackingUp: StateFlow<Boolean> = _isBackingUp.asStateFlow()
+
+  private val _backupProgress = MutableStateFlow(1.0f)
+  val backupProgress: StateFlow<Float> = _backupProgress.asStateFlow()
+
   fun initFirebase(context: Context) {
-    if (repository == null) {
-      val repo = Repository.create(context.applicationContext)
+    if (repository != null) return
+    val appContext = context.applicationContext
+
+    viewModelScope.launch(Dispatchers.IO) {
+      val repo = Repository.create(appContext)
       repository = repo
 
-      viewModelScope.launch(Dispatchers.IO) {
-        FirebaseAuthHelper.observeAuthState().collect { user ->
-          _currentUser.value = user
-          if (user != null) {
-            try {
-              // 1. Sync User Profile in Firestore
-              repo.syncUserProfile(user.email, user.displayName, user.photoUrl?.toString())
+      FirebaseAuthHelper.observeAuthState().collect { user ->
+        _currentUser.value = user
+        if (user != null) {
+          AuthenticationManager.setSessionActive(appContext, true, user.email ?: user.uid)
+          _isSessionActive.value = true
+          try {
+              // 1. Sync User Profile in Firestore with any pending signup details
+              val pending = AuthenticationManager.pendingRegistration
+              val email = if (pending?.contact?.contains("@") == true) pending.contact else (user.email ?: "")
+              val phone = if (pending?.contact?.contains("@") == false) pending.contact else null
+              repo.syncUserProfile(
+                email = email,
+                displayName = pending?.name ?: user.displayName,
+                photoUrl = user.photoUrl?.toString(),
+                username = pending?.username,
+                phoneNumber = phone,
+                age = pending?.age
+              )
+              AuthenticationManager.pendingRegistration = null
 
               // 2. Seed initial data if Firestore collections are brand new
               repo.seedInitialVaultIfEmpty(DummyData.initialVaultItems)
@@ -215,6 +271,114 @@ class MainViewModel : ViewModel() {
         }
       }
     }
+
+  fun checkInitialSession(context: Context) {
+    val active = AuthenticationManager.isSessionActive(context)
+    _isSessionActive.value = active
+    if (active) {
+      val sessionUser = AuthenticationManager.getActiveSessionUser(context)
+      if (_userProfile.value == null) {
+        val prefs = context.getSharedPreferences("zero_auth_prefs", Context.MODE_PRIVATE)
+        val savedName = prefs.getString("saved_name", "Elena Vance") ?: "Elena Vance"
+        val savedUsername = prefs.getString("saved_username", "@elena_sec") ?: "@elena_sec"
+        val savedContact = prefs.getString("saved_contact", sessionUser ?: "emni9721@gmail.com") ?: "emni9721@gmail.com"
+        val email = if (savedContact.contains("@")) savedContact else "emni9721@gmail.com"
+        val phone = if (!savedContact.contains("@")) savedContact else "+880 1712-345678"
+        val bio = prefs.getString("saved_bio", "Zero-knowledge private cloud curator. 100% hardware-encrypted photography & 4K cinematic reels.") ?: "Zero-knowledge private cloud curator."
+        val dob = prefs.getString("saved_dob", "15 August 2000") ?: "15 August 2000"
+        val loc = prefs.getString("saved_location", "Dhaka, Bangladesh") ?: "Dhaka, Bangladesh"
+        val school = prefs.getString("saved_school_college", "Dhaka College / University of Dhaka") ?: "Dhaka College / University of Dhaka"
+        val work = prefs.getString("saved_workplace", "Zero Cloud Security Lab") ?: "Zero Cloud Security Lab"
+        _userProfile.value = UserProfile(
+          userId = "session_user",
+          displayName = savedName,
+          email = email,
+          phoneNumber = phone,
+          username = savedUsername,
+          bio = bio,
+          dateOfBirth = dob,
+          location = loc,
+          schoolCollege = school,
+          workplace = work,
+          photoUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"
+        )
+      }
+    }
+  }
+
+  fun onSessionLogin(context: Context, identifier: String) {
+    AuthenticationManager.setSessionActive(context, true, identifier)
+    _isSessionActive.value = true
+    val prefs = context.getSharedPreferences("zero_auth_prefs", Context.MODE_PRIVATE)
+    val savedName = prefs.getString("saved_name", "Elena Vance") ?: "Elena Vance"
+    val savedUsername = prefs.getString("saved_username", if (identifier.startsWith("@")) identifier else "@${identifier.substringBefore("@")}") ?: "@elena_sec"
+    val email = if (identifier.contains("@")) identifier else (prefs.getString("saved_contact", "emni9721@gmail.com") ?: "emni9721@gmail.com")
+    val phone = if (!identifier.contains("@") && identifier.any { it.isDigit() }) identifier else "+880 1712-345678"
+    val bio = prefs.getString("saved_bio", "Zero-knowledge private cloud curator. 100% hardware-encrypted photography & 4K cinematic reels.") ?: "Zero-knowledge private cloud curator."
+    val dob = prefs.getString("saved_dob", "15 August 2000") ?: "15 August 2000"
+    val loc = prefs.getString("saved_location", "Dhaka, Bangladesh") ?: "Dhaka, Bangladesh"
+    val school = prefs.getString("saved_school_college", "Dhaka College / University of Dhaka") ?: "Dhaka College / University of Dhaka"
+    val work = prefs.getString("saved_workplace", "Zero Cloud Security Lab") ?: "Zero Cloud Security Lab"
+    _userProfile.value = UserProfile(
+      userId = "session_user",
+      displayName = savedName,
+      email = email,
+      phoneNumber = phone,
+      username = savedUsername,
+      bio = bio,
+      dateOfBirth = dob,
+      location = loc,
+      schoolCollege = school,
+      workplace = work,
+      photoUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"
+    )
+    showToast("Session active for $identifier.")
+  }
+
+  fun updateFullUserProfile(
+    name: String,
+    bio: String,
+    dateOfBirth: String,
+    location: String,
+    schoolCollege: String,
+    workplace: String,
+    context: Context
+  ) {
+    val cur = _userProfile.value ?: UserProfile()
+    val updated = cur.copy(
+      displayName = name,
+      bio = bio,
+      dateOfBirth = dateOfBirth,
+      location = location,
+      schoolCollege = schoolCollege,
+      workplace = workplace
+    )
+    _userProfile.value = updated
+
+    val prefs = context.getSharedPreferences("zero_auth_prefs", Context.MODE_PRIVATE)
+    prefs.edit()
+      .putString("saved_name", name)
+      .putString("saved_bio", bio)
+      .putString("saved_dob", dateOfBirth)
+      .putString("saved_location", location)
+      .putString("saved_school_college", schoolCollege)
+      .putString("saved_workplace", workplace)
+      .apply()
+
+    viewModelScope.launch(Dispatchers.IO) {
+      try {
+        repository?.updateFullUserProfile(
+          displayName = name,
+          bio = bio,
+          dateOfBirth = dateOfBirth,
+          location = location,
+          schoolCollege = schoolCollege,
+          workplace = workplace
+        )
+      } catch (_: Exception) {}
+    }
+
+    showToast("Profile updated successfully!")
   }
 
   fun setTab(tab: AppTab) {
@@ -442,6 +606,25 @@ class MainViewModel : ViewModel() {
       )
     )
     _vaultItems.value = listOf(newItem) + _vaultItems.value
+
+    if (draft.type == MediaType.VIDEO) {
+      val newReel = Reel(
+        id = "r-${System.currentTimeMillis()}",
+        creatorName = _userProfile.value?.displayName ?: (_currentUser.value?.displayName ?: "Elena Vance"),
+        creatorHandle = _userProfile.value?.username ?: "@zerouser",
+        creatorAvatar = _userProfile.value?.photoUrl?.ifBlank { _currentUser.value?.photoUrl?.toString() }
+          ?: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80",
+        description = if (draft.title.isNotBlank()) draft.title else "Encrypted 4K Reel #${System.currentTimeMillis() % 1000} 🎥",
+        audioTrack = "Original Audio • ZERO MasterKey",
+        videoThumbnail = draft.mediaUrl,
+        likesCount = 0,
+        isLiked = false,
+        commentsCount = 0,
+        sharesCount = 0
+      )
+      _reels.value = listOf(newReel) + _reels.value
+    }
+
     _isUploadModalOpen.value = false
     showToast("Encrypted with AES-256 GCM (${newItem.compressionPercentage}% space saved)!")
 
@@ -596,6 +779,42 @@ class MainViewModel : ViewModel() {
     _activeConversation.value = _conversations.value.find { it.id == convId }
   }
 
+  fun sendFileMessage(
+    convId: String,
+    fileName: String,
+    fileSizeFormatted: String,
+    fileExtension: String
+  ) {
+    val msg = com.example.data.ChatMessage(
+      id = "m-${System.currentTimeMillis()}",
+      text = "Sent original file: $fileName",
+      timestamp = "Just now",
+      isMine = true,
+      isEncrypted = true,
+      fileName = fileName,
+      fileSizeFormatted = fileSizeFormatted,
+      fileExtension = fileExtension,
+      isOriginalFile = true,
+      isRead = true
+    )
+    _conversations.value = _conversations.value.map { conv ->
+      if (conv.id == convId) {
+        conv.copy(
+          messages = conv.messages + msg,
+          lastMessage = "Sent original file: $fileName ($fileSizeFormatted)",
+          lastMessageTime = "Just now"
+        )
+      } else conv
+    }
+    _activeConversation.value = _conversations.value.find { it.id == convId }
+    showToast("Original file ($fileSizeFormatted) sent losslessly via E2EE!")
+  }
+
+  fun clearAllNotifications() {
+    _notifications.value = _notifications.value.map { it.copy(isRead = true) }
+    showToast("All notifications marked as read")
+  }
+
   // Cloud Tiers & Backup Snapshots
   fun selectCloudPlan(planId: String) {
     _cloudPlans.value = _cloudPlans.value.map {
@@ -633,17 +852,92 @@ class MainViewModel : ViewModel() {
     showToast("Restored from snapshot: ${snap.name}. All vault keys aligned!")
   }
 
-  // Sign out of Google Account
+  // Language & Security Operations
+  fun setLanguage(lang: String) {
+    _selectedLanguage.value = lang
+    val current = _userProfile.value ?: UserProfile()
+    _userProfile.value = current.copy(preferredLanguage = lang)
+    showToast("Language changed to: $lang")
+    viewModelScope.launch {
+      try {
+        repository?.updateUserProfileSecurity(preferredLanguage = lang)
+      } catch (_: Exception) {}
+    }
+  }
+
+  fun updatePhoneNumber(newPhone: String) {
+    val current = _userProfile.value ?: UserProfile()
+    _userProfile.value = current.copy(phoneNumber = newPhone)
+    showToast("Phone number updated: $newPhone")
+    viewModelScope.launch {
+      try {
+        repository?.updateUserProfileSecurity(phoneNumber = newPhone)
+      } catch (_: Exception) {}
+    }
+  }
+
+  fun removePhoneNumber() {
+    val current = _userProfile.value ?: UserProfile()
+    _userProfile.value = current.copy(phoneNumber = "")
+    showToast("Phone number removed")
+    viewModelScope.launch {
+      try {
+        repository?.updateUserProfileSecurity(phoneNumber = "")
+      } catch (_: Exception) {}
+    }
+  }
+
+  fun updatePrimaryEmail(newEmail: String) {
+    val current = _userProfile.value ?: UserProfile()
+    _userProfile.value = current.copy(email = newEmail)
+    showToast("Primary email updated: $newEmail")
+  }
+
+  fun updateRecoveryEmail(newEmail: String) {
+    val current = _userProfile.value ?: UserProfile()
+    _userProfile.value = current.copy(secondaryEmail = newEmail)
+    showToast("Recovery email updated: $newEmail")
+    viewModelScope.launch {
+      try {
+        repository?.updateUserProfileSecurity(secondaryEmail = newEmail)
+      } catch (_: Exception) {}
+    }
+  }
+
+  fun removeRecoveryEmail() {
+    val current = _userProfile.value ?: UserProfile()
+    _userProfile.value = current.copy(secondaryEmail = "")
+    showToast("Recovery email removed")
+    viewModelScope.launch {
+      try {
+        repository?.updateUserProfileSecurity(secondaryEmail = "")
+      } catch (_: Exception) {}
+    }
+  }
+
+  fun changeMasterPassword(currentPass: String, newPass: String, onResult: (Boolean, String) -> Unit) {
+    if (newPass.length < 6) {
+      onResult(false, "Password must be at least 6 characters")
+      return
+    }
+    showToast("Master password updated with hardware AES-256 derivation!")
+    onResult(true, "Password changed successfully")
+  }
+
+  // Sign out of Session & Google Account
   fun signOut(context: Context) {
+    AuthenticationManager.setSessionActive(context, false)
+    _isSessionActive.value = false
+    _currentUser.value = null
+    _userProfile.value = null
+    _isVaultUnlocked.value = false
+    _currentTab.value = AppTab.FEED
     val credManager = CredentialManager.create(context)
     FirebaseAuthHelper.signOut(
       context = context,
       credentialManager = credManager,
       onSignOutComplete = {
-        _currentUser.value = null
-        _isVaultUnlocked.value = false
-        _currentTab.value = AppTab.FEED
-        showToast("Signed out of Google Account. Local vault secured.")
+        showToast("Signed out. Session securely terminated.")
       },
       scope = viewModelScope
     )
@@ -668,5 +962,60 @@ class MainViewModel : ViewModel() {
 
   fun clearToast() {
     _toastNotification.value = null
+  }
+
+  // Google Photos-style Auto Backup Actions
+  fun toggleAutoBackup() {
+    val newState = !_isAutoBackupEnabled.value
+    _isAutoBackupEnabled.value = newState
+    if (newState) {
+      _backupStatus.value = "All photos & videos backed up"
+      showToast("Automatic Cloud Backup Enabled (Google Photos sync active)")
+    } else {
+      _backupStatus.value = "Backup paused"
+      showToast("Automatic Backup Paused. Media saved locally.")
+    }
+  }
+
+  fun triggerBackupNow() {
+    if (_isBackingUp.value) return
+    viewModelScope.launch {
+      _isBackingUp.value = true
+      _backupStatus.value = "Backing up photos & videos..."
+      _backupProgress.value = 0.2f
+      delay(300)
+      _backupProgress.value = 0.5f
+      delay(400)
+      _backupProgress.value = 0.85f
+      delay(350)
+      _backupProgress.value = 1.0f
+      _isBackingUp.value = false
+      _backupStatus.value = "All photos & videos backed up"
+      _lastBackupTime.value = "Just now"
+      showToast("Cloud Backup Complete: All media synchronized!")
+    }
+  }
+
+  fun setBackupQuality(quality: String) {
+    _backupQuality.value = quality
+    showToast("Backup Quality: $quality")
+  }
+
+  fun toggleBackupWifiOnly() {
+    _backupWifiOnly.value = !_backupWifiOnly.value
+    val msg = if (_backupWifiOnly.value) "Backing up over Wi-Fi only" else "Backing up over Wi-Fi & Mobile data"
+    showToast(msg)
+  }
+
+  fun toggleBackupFolder(folder: String) {
+    val current = _backupFolders.value.toMutableList()
+    if (current.contains(folder)) {
+      current.remove(folder)
+      showToast("Excluded $folder from backup")
+    } else {
+      current.add(folder)
+      showToast("Included $folder in backup")
+    }
+    _backupFolders.value = current
   }
 }

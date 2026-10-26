@@ -9,7 +9,7 @@ import com.google.firebase.auth.FirebaseUser
  */
 @Composable
 fun AuthScreen(
-  onAuthSuccess: (FirebaseUser) -> Unit,
+  onAuthSuccess: (String) -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   LoginScreen(
